@@ -1,39 +1,83 @@
 spring:
   application:
     name: openshift-dashboard
+  # Optional: Configure Thymeleaf caching (useful for development)
+  # thymeleaf:
+  #   cache: false
 
 server:
-  port: 8080
+  port: 8080 # Default port, change if needed
 
-# Logging (Example: set root to INFO, specific package to DEBUG)
+# Logging Configuration (Example)
 logging:
   level:
-    root: INFO
-    com.example.openshiftdashboard: DEBUG
-    io.fabric8: INFO # Set to DEBUG for very verbose Fabric8 client logging
+    root: INFO # Default logging level for all packages
+    com.example.openshiftdashboard: DEBUG # More detailed logging for your application packages
+    io.fabric8.kubernetes.client: INFO # Set to DEBUG for very verbose Fabric8 client logs, useful for deep troubleshooting
+    # To see HTTP request/response headers and bodies from Fabric8 (very verbose):
+    # io.fabric8.kubernetes.client.okhttp.OkHttpClientImpl: TRACE
 
 openshift:
-  scheduler-cron: "0 0/15 * * * ?" # Every 15 minutes, override default
-  instances:
-    - name: "Dev-Cluster-DC1"
-      url: "https://api.dev-cluster.example.com:6443" # REPLACE WITH YOUR ACTUAL URL
-      # Option 1: Username/Password (less secure, usually for OAuth token exchange)
-      # username: "your-username"
-      # password: "your-password"
-      # Option 2: Token (preferred for direct API calls)
-      token: "sha256~your-openshift-api-token-here" # REPLACE with a valid token
-      namespaces:
-        - "dev-namespace-100"
-        - "dev-namespace-200"
-      dataCenter: "DC1" # User-defined
-    - name: "Staging-Cluster-DC2"
-      url: "https://api.staging-cluster.example.com:6443" # REPLACE WITH YOUR ACTUAL URL
-      token: "sha256~another-openshift-api-token-here" # REPLACE
-      namespaces:
-        - "staging-namespace-300"
-        - "staging-namespace-400"
-        - "dev-namespace-100" # Namespace '100' can exist in multiple clusters
-      dataCenter: "DC2"
+  # Cron expression for the data refresh scheduler.
+  # Default is every 15 minutes. (Seconds Minutes Hours Day-of-Month Month Day-of-Week)
+  # Example: "0 0/15 * * * ?" -> Every 15 minutes
+  # Example: "0 0 */1 * * ?" -> Every hour at the start of the hour
+  scheduler-cron: "0 0/15 * * * ?"
 
-# Thymeleaf settings (optional, defaults are usually fine)
-# spring.thymeleaf.cache: false # Disable caching during development
+  instances:
+    # --- Example Instance 1: Using Username/Password ---
+    # Ensure your OpenShift cluster and Fabric8 client version support direct username/password auth for API calls,
+    # or that Fabric8 handles an implicit token exchange. Standard OAuth flow is more robust for UIs.
+    - name: "Development Cluster DC-East"
+      url: "https://api.dev-cluster.east.example.com:6443" # REPLACE with your actual OpenShift API URL
+      username: "your-dev-username"                     # REPLACE with your username
+      password: "your-dev-password"                     # REPLACE with your password (SECURITY WARNING: Avoid in production configs)
+      # token: "" # Leave blank or remove if using username/password
+      namespaces:
+        - "project-alpha"
+        - "project-beta-ci"
+      dataCenter: "DC-East" # User-defined identifier for the data center
+
+    # --- Example Instance 2: Using API Token ---
+    # This is generally the more secure and recommended method for service accounts or automated tools.
+    - name: "Production Cluster DC-West"
+      url: "https://api.prod-cluster.west.example.com:6443" # REPLACE with your actual OpenShift API URL
+      # username: "" # Leave blank or remove if using token
+      # password: "" # Leave blank or remove if using token
+      token: "sha256~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # REPLACE with your actual OpenShift API token
+      namespaces:
+        - "app-prod-ns1"
+        - "app-prod-ns2"
+        - "shared-services-prod"
+      dataCenter: "DC-West"
+
+    # --- Example Instance 3: Another region, perhaps different auth ---
+    - name: "Staging Cluster DC-North"
+      url: "https://api.staging-cluster.north.example.com:6443" # REPLACE
+      # Provide either username/password OR token based on your setup for this instance
+      username: "staging-user" # REPLACE
+      password: "staging-password" # REPLACE (SECURITY WARNING)
+      # token: "sha256~yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy" # REPLACE
+      namespaces:
+        - "uat-namespace-a"
+        - "project-gamma-staging"
+      dataCenter: "DC-North"
+
+    # --- Example Instance 4: Minimal config, might attempt anonymous or rely on local kubeconfig if client supports ---
+    # (Anonymous access is typically disabled on secure clusters)
+    # - name: "Lab Cluster Local"
+    #   url: "https://api.lab.internal:6443" # REPLACE
+    #   # No username, password, or token provided - connection might fail or use local context
+    #   namespaces:
+    #     - "test-namespace"
+    #   dataCenter: "Local-Lab"
+
+# SECURITY WARNING FOR CREDENTIALS:
+# Storing plaintext passwords in configuration files is a security risk, especially in production.
+# Consider using:
+# 1. Environment Variables: Set credentials as environment variables and reference them in this file (e.g., `${OPENSHIFT_USER_DC1}`).
+# 2. Spring Cloud Config Server: With encrypted properties using a symmetric key or Vault backend.
+# 3. HashiCorp Vault: Integrate Spring Boot with Vault for secrets management.
+# 4. Kubernetes Secrets: If this dashboard application itself runs within a Kubernetes/OpenShift cluster,
+#    mount secrets and read credentials from there.
+# For token authentication, ensure tokens are treated as sensitive data and have appropriate, minimal permissions.

@@ -41,20 +41,26 @@ public class OpenShiftClientService {
         List<PodUIDetail> podDetailsList = new ArrayList<>();
         ConfigBuilder configBuilder = new ConfigBuilder().withMasterUrl(instanceProperties.getUrl());
 
-        if (StringUtils.hasText(instanceProperties.getToken())) {
-            configBuilder.withOauthToken(instanceProperties.getToken());
-            logger.debug("Using token authentication for instance: {}", instanceProperties.getName());
-        } else if (StringUtils.hasText(instanceProperties.getUsername()) && StringUtils.hasText(instanceProperties.getPassword())) {
+        // ** MODIFIED AUTHENTICATION LOGIC: Prioritize Username/Password **
+        if (StringUtils.hasText(instanceProperties.getUsername()) && StringUtils.hasText(instanceProperties.getPassword())) {
             configBuilder.withUsername(instanceProperties.getUsername());
             configBuilder.withPassword(instanceProperties.getPassword());
             logger.debug("Using username/password authentication for instance: {}", instanceProperties.getName());
+            // Note: Direct basic auth against K8s API might require specific cluster configuration.
+            // Often, username/password is used in an OAuth flow to obtain a token first.
+            // This setup assumes the Fabric8 client + cluster config supports this direct method.
+        } else if (StringUtils.hasText(instanceProperties.getToken())) {
+            configBuilder.withOauthToken(instanceProperties.getToken());
+            logger.debug("Using token authentication for instance: {} (username/password not provided)", instanceProperties.getName());
         } else {
-            logger.warn("No authentication method (token or username/password) configured for instance: {}. Attempting anonymous connection.", instanceProperties.getName());
+            logger.warn("No authentication method (username/password or token) configured for instance: {}. Attempting anonymous connection.", instanceProperties.getName());
+            // Anonymous connection will likely fail on most secure clusters.
         }
 
-        // WARNING: Insecure for production. Configure proper CA certificates.
+        // WARNING: Insecure for production. Configure proper CA certificates for the Kubernetes client.
+        // This should ideally be configurable per instance or globally with proper truststore setup.
         configBuilder.withTrustCerts(true);
-        logger.debug("Trusting all certificates for instance: {} (Development setting)", instanceProperties.getName());
+        logger.debug("Trusting all certificates for instance: {} (Development setting - ensure this is acceptable for your environment)", instanceProperties.getName());
 
 
         Config config = configBuilder.build();
@@ -88,6 +94,7 @@ public class OpenShiftClientService {
                 }
             }
         } catch (KubernetesClientException e) {
+            // This often indicates auth failure if credentials are wrong or not permitted for API access.
             logger.error("Failed to connect to or process OpenShift instance '{}' (Kubernetes API error). Status: {}. Message: {}",
                     instanceProperties.getName(), e.getStatus(), e.getMessage());
         } catch (Exception e) {
@@ -206,10 +213,10 @@ public class OpenShiftClientService {
             } else {
                 if (podMetricsList == null || podMetricsList.getItems() == null || podMetricsList.getItems().isEmpty()) {
                     logger.debug("No metrics list or empty metrics list returned by .metrics() for pod {} in namespace {}.", pod.getMetadata().getName(), actualNamespace);
-                } else if (podMetrics == null) { // List was not empty, but somehow podMetrics is still null (should not happen if list had items)
+                } else if (podMetrics == null) {
                     logger.warn("Metrics list was not empty, but failed to extract a PodMetrics object for pod {} in namespace {}.", pod.getMetadata().getName(), actualNamespace);
                 }
-                else { // podMetrics is not null, but containers are empty or null
+                else {
                     logger.debug("PodMetrics object found for pod {} in namespace {} but it has no container metrics.", pod.getMetadata().getName(), actualNamespace);
                 }
             }
