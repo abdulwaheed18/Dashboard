@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: openshift-dashboard
+
+server:
+  port: 8080
+
+# Logging (Example: set root to INFO, specific package to DEBUG)
+logging:
+  level:
+    root: INFO
+    com.example.openshiftdashboard: DEBUG
+    io.fabric8: INFO # Set to DEBUG for very verbose Fabric8 client logging
+
+openshift:
+  scheduler-cron: "0 0/15 * * * ?" # Every 15 minutes, override default
+  instances:
+    - name: "Dev-Cluster-DC1"
+      url: "https://api.dev-cluster.example.com:6443" # REPLACE WITH YOUR ACTUAL URL
+      # Option 1: Username/Password (less secure, usually for OAuth token exchange)
+      # username: "your-username"
+      # password: "your-password"
+      # Option 2: Token (preferred for direct API calls)
+      token: "sha256~your-openshift-api-token-here" # REPLACE with a valid token
+      namespaces:
+        - "dev-namespace-100"
+        - "dev-namespace-200"
+      dataCenter: "DC1" # User-defined
+    - name: "Staging-Cluster-DC2"
+      url: "https://api.staging-cluster.example.com:6443" # REPLACE WITH YOUR ACTUAL URL
+      token: "sha256~another-openshift-api-token-here" # REPLACE
+      namespaces:
+        - "staging-namespace-300"
+        - "staging-namespace-400"
+        - "dev-namespace-100" # Namespace '100' can exist in multiple clusters
+      dataCenter: "DC2"
+
+# Thymeleaf settings (optional, defaults are usually fine)
+# spring.thymeleaf.cache: false # Disable caching during development
